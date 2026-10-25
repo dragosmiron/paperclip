@@ -1676,6 +1676,12 @@ waiting for provider startup. An abrupt controller exit during session opening
 can then recover through the same exact process-identity checks as an active turn.
 
 Both graceful and hot restarts detach the old controller from native sessions.
+Remote Runner processes use their authenticated connection lease as the bound
+on disconnected lifetime. The controller's shorter connection-recovery budget
+limits its own attempt; it must not terminate the remote owner while another
+controller is starting or classifying runs. Lease expiry still shuts down the
+provider, and exact identity, authentication, Stop and revocation checks remain
+required before any recovery or new execution.
 If shutdown begins while a provider session is opening, its eventual publication
 honors the pending detachment before dispatching a turn. Once detached, an old
 execution finalizer cannot suspend or signal the durable runner: the next

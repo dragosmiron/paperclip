@@ -857,6 +857,11 @@ function runnerCloseGraceMs(options: Pick<CapabilityRunnerdCodexTransportOptions
   return options.closeGraceMs ?? (options.provider === "acpx" && options.acpxAgent === "pi" ? 45_000 : 10_000);
 }
 
+function runnerProcessReconnectGraceMs(options: CapabilityRunnerdCodexTransportOptions): number | undefined {
+  if (options.runnerProcessReconnectGraceMs === null) return undefined;
+  return options.runnerProcessReconnectGraceMs ?? options.runnerReconnectGraceMs;
+}
+
 function runnerCloseDeadlines(
   startedAtMs: number,
   graceMs: number,
@@ -5074,7 +5079,7 @@ class DurablePrpCodexTransport implements CodexAppServerTransport {
       maxOutboxBytes: RUNNERD_MAX_OUTBOX_BYTES,
       p0ReserveBytes: RUNNERD_P0_RESERVE_BYTES,
       maxRuntimeMs: 0,
-      reconnectGraceMs: this.options.runnerReconnectGraceMs,
+      reconnectGraceMs: runnerProcessReconnectGraceMs(this.options),
       lifecyclePolicy: this.options.lifecyclePolicy,
       runnerBinaryPath,
       runnerVersion: runnerArtifact.version,
@@ -5759,7 +5764,7 @@ class DurablePrpCodexTransport implements CodexAppServerTransport {
           maxOutboxBytes: RUNNERD_MAX_OUTBOX_BYTES,
           p0ReserveBytes: RUNNERD_P0_RESERVE_BYTES,
           maxRuntimeMs: 0,
-          reconnectGraceMs: this.options.runnerReconnectGraceMs,
+          reconnectGraceMs: runnerProcessReconnectGraceMs(this.options),
           lifecyclePolicy: this.options.lifecyclePolicy,
           runnerBinaryPath,
           runnerVersion: runnerArtifact.version,
