@@ -165,6 +165,37 @@ describe("TaskDocumentPanel", () => {
     expect(newCopyBtn?.textContent).toContain("Copy");
   });
 
+  it("does not update copied state if document changes while copy is in flight", async () => {
+    let resolveCopy = () => {};
+    copyTextMock.mockImplementationOnce(() => new Promise<undefined>((resolve) => {
+      resolveCopy = () => resolve(undefined);
+    }));
+
+    await renderPanel();
+    const copyBtn = container.querySelector<HTMLButtonElement>('button[title="Copy Markdown"]');
+    await act(async () => {
+      copyBtn!.click();
+    });
+
+    const otherDoc: IssueDocument = { ...sampleDoc, key: "other-doc", title: "Other Document" };
+    client.setQueryData([...queryKeys.issues.documents(otherDoc.issueId), otherDoc.key], otherDoc);
+    await act(async () => {
+      root.render(
+        <QueryClientProvider client={client}>
+          <TaskDocumentPanel issueId={otherDoc.issueId} documentKey={otherDoc.key} initialDocument={otherDoc} />
+        </QueryClientProvider>,
+      );
+    });
+
+    await act(async () => {
+      resolveCopy();
+    });
+
+    const newCopyBtn = container.querySelector<HTMLButtonElement>('button[title="Copy Markdown"]');
+    expect(newCopyBtn?.textContent).toContain("Copy");
+    expect(newCopyBtn?.textContent).not.toContain("Copied");
+  });
+
   it("triggers download with safe slugified filename and falls back to key when title is absent", async () => {
     const createObjectURLMock = vi.fn(() => "blob:http://localhost/test-uuid");
     const revokeObjectURLMock = vi.fn();

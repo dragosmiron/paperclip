@@ -26,8 +26,10 @@ export function TaskDocumentPanel({
   const [copied, setCopied] = useState(false);
   const [copyFailed, setCopyFailed] = useState(false);
   const copyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const activeTargetRef = useRef({ issueId, documentKey });
 
   useEffect(() => {
+    activeTargetRef.current = { issueId, documentKey };
     if (copyTimerRef.current) clearTimeout(copyTimerRef.current);
     setCopied(false);
     setCopyFailed(false);
@@ -81,17 +83,28 @@ export function TaskDocumentPanel({
 
   const handleCopy = async () => {
     if (document.body == null) return;
+    const target = { issueId, documentKey };
+    const isTargetActive = () =>
+      activeTargetRef.current.issueId === target.issueId &&
+      activeTargetRef.current.documentKey === target.documentKey;
+
     try {
       await copyTextToClipboard(document.body);
+      if (!isTargetActive()) return;
       setCopyFailed(false);
       setCopied(true);
       if (copyTimerRef.current) clearTimeout(copyTimerRef.current);
-      copyTimerRef.current = setTimeout(() => setCopied(false), 1500);
+      copyTimerRef.current = setTimeout(() => {
+        if (isTargetActive()) setCopied(false);
+      }, 1500);
     } catch {
+      if (!isTargetActive()) return;
       setCopied(false);
       setCopyFailed(true);
       if (copyTimerRef.current) clearTimeout(copyTimerRef.current);
-      copyTimerRef.current = setTimeout(() => setCopyFailed(false), 2000);
+      copyTimerRef.current = setTimeout(() => {
+        if (isTargetActive()) setCopyFailed(false);
+      }, 2000);
     }
   };
 
