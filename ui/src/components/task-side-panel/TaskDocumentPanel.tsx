@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import type { IssueDocument } from "@paperclipai/shared";
-import { FileQuestion, Loader2 } from "lucide-react";
+import { Check, Copy, Download, FileQuestion, Loader2 } from "lucide-react";
 import { ApiError } from "@/api/client";
 import { issuesApi } from "@/api/issues";
 import { DocumentAnnotationsCountChip, IssueDocumentAnnotations } from "@/components/IssueDocumentAnnotations";
@@ -9,6 +9,8 @@ import { MarkdownBody } from "@/components/MarkdownBody";
 import { queryKeys } from "@/lib/queryKeys";
 import { documentDisplayTitle } from "@/lib/issue-artifacts";
 import { useLocation } from "@/lib/router";
+import { copyTextToClipboard } from "@/lib/clipboard";
+import { Button } from "@/components/ui/button";
 
 export function TaskDocumentPanel({
   issueId,
@@ -21,6 +23,8 @@ export function TaskDocumentPanel({
 }) {
   const location = useLocation();
   const [annotationPanelOpen, setAnnotationPanelOpen] = useState(false);
+  const [copied, setCopied] = useState(false);
+
   const query = useQuery<IssueDocument | null>({
     queryKey: [...queryKeys.issues.documents(issueId), documentKey],
     queryFn: async () => {
@@ -64,10 +68,62 @@ export function TaskDocumentPanel({
     );
   }
 
+  const handleCopy = async () => {
+    if (!document.body) return;
+    try {
+      await copyTextToClipboard(document.body);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch (e) {
+      console.error("Failed to copy:", e);
+    }
+  };
+
+  const handleDownload = () => {
+    if (!document.body) return;
+    const blob = new Blob([document.body], { type: "text/markdown;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const link = window.document.createElement("a");
+    link.href = url;
+    const safeTitle = (document.title || document.key || "document")
+      .toLowerCase()
+      .replace(/[^a-z0-9_-]+/g, "-")
+      .replace(/^-+|-+$/g, "");
+    link.download = `${safeTitle || "document"}.md`;
+    window.document.body.appendChild(link);
+    link.click();
+    window.document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
   return (
     <article className="space-y-4">
-      <header className="space-y-1">
-        <h2 className="text-lg font-semibold">{documentDisplayTitle(document)}</h2>
+      <header className="space-y-2 border-b pb-3">
+        <div className="flex items-center justify-end gap-1.5">
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-7 px-2.5 text-xs font-normal flex items-center gap-1.5 cursor-pointer"
+            onClick={handleCopy}
+            title="Copy Markdown"
+            aria-label="Copy Markdown"
+          >
+            {copied ? <Check className="size-3.5 text-emerald-600" aria-hidden /> : <Copy className="size-3.5" aria-hidden />}
+            <span>{copied ? "Copied" : "Copy"}</span>
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-7 px-2.5 text-xs font-normal flex items-center gap-1.5 cursor-pointer"
+            onClick={handleDownload}
+            title="Download Markdown"
+            aria-label="Download Markdown"
+          >
+            <Download className="size-3.5" aria-hidden />
+            <span>Download</span>
+          </Button>
+        </div>
+        <h2 className="text-lg font-semibold leading-tight">{documentDisplayTitle(document)}</h2>
         <div className="flex flex-wrap items-center gap-1 text-xs text-muted-foreground">
           <span>{`Revision ${document.latestRevisionNumber ?? 1}`}</span>
           <span aria-hidden>·</span>
