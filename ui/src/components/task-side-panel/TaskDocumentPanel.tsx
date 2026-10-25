@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import type { IssueDocument } from "@paperclipai/shared";
 import { Check, Copy, Download, FileQuestion, Loader2 } from "lucide-react";
@@ -24,6 +24,17 @@ export function TaskDocumentPanel({
   const location = useLocation();
   const [annotationPanelOpen, setAnnotationPanelOpen] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [copyFailed, setCopyFailed] = useState(false);
+  const copyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    if (copyTimerRef.current) clearTimeout(copyTimerRef.current);
+    setCopied(false);
+    setCopyFailed(false);
+    return () => {
+      if (copyTimerRef.current) clearTimeout(copyTimerRef.current);
+    };
+  }, [issueId, documentKey]);
 
   const query = useQuery<IssueDocument | null>({
     queryKey: [...queryKeys.issues.documents(issueId), documentKey],
@@ -72,10 +83,15 @@ export function TaskDocumentPanel({
     if (document.body == null) return;
     try {
       await copyTextToClipboard(document.body);
+      setCopyFailed(false);
       setCopied(true);
-      setTimeout(() => setCopied(false), 1500);
-    } catch (e) {
-      console.error("Failed to copy:", e);
+      if (copyTimerRef.current) clearTimeout(copyTimerRef.current);
+      copyTimerRef.current = setTimeout(() => setCopied(false), 1500);
+    } catch {
+      setCopied(false);
+      setCopyFailed(true);
+      if (copyTimerRef.current) clearTimeout(copyTimerRef.current);
+      copyTimerRef.current = setTimeout(() => setCopyFailed(false), 2000);
     }
   };
 
@@ -105,11 +121,11 @@ export function TaskDocumentPanel({
             size="sm"
             className="h-7 px-2.5 text-xs font-normal flex items-center gap-1.5 cursor-pointer"
             onClick={handleCopy}
-            title="Copy Markdown"
-            aria-label="Copy Markdown"
+            title={copyFailed ? "Failed to copy" : "Copy Markdown"}
+            aria-label={copyFailed ? "Failed to copy" : "Copy Markdown"}
           >
-            {copied ? <Check className="size-3.5 text-emerald-600" aria-hidden /> : <Copy className="size-3.5" aria-hidden />}
-            <span>{copied ? "Copied" : "Copy"}</span>
+            {copied ? <Check className="size-3.5" aria-hidden /> : <Copy className="size-3.5" aria-hidden />}
+            <span>{copyFailed ? "Failed" : copied ? "Copied" : "Copy"}</span>
           </Button>
           <Button
             variant="outline"

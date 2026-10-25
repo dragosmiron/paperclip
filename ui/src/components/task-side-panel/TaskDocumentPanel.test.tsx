@@ -21,23 +21,33 @@ vi.mock("@/components/IssueDocumentAnnotations", () => ({
   DocumentAnnotationsCountChip: () => <span data-testid="annotations-chip" />,
 }));
 
-const copyTextMock = vi.fn(async () => undefined);
+const copyTextMock = vi.fn(async (_text: string) => undefined);
 vi.mock("@/lib/clipboard", () => ({
   copyTextToClipboard: (text: string) => copyTextMock(text),
 }));
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
+const now = new Date();
 const sampleDoc: IssueDocument = {
   id: "doc-1",
+  companyId: "company-1",
   issueId: "issue-123",
   key: "published-post",
   title: "Why I Run Dual Caddy",
+  format: "markdown",
   body: "# Homelab Setup\n\nDual Caddy and Dual DNS.",
   latestRevisionNumber: 2,
   latestRevisionId: "rev-2",
-  createdAt: new Date().toISOString(),
-  updatedAt: new Date().toISOString(),
+  createdByAgentId: null,
+  createdByUserId: null,
+  updatedByAgentId: null,
+  updatedByUserId: null,
+  lockedAt: null,
+  lockedByAgentId: null,
+  lockedByUserId: null,
+  createdAt: now,
+  updatedAt: now,
 };
 
 describe("TaskDocumentPanel", () => {
@@ -111,6 +121,50 @@ describe("TaskDocumentPanel", () => {
     expect(copyBtn?.textContent).toContain("Copy");
   });
 
+  it("shows failure label when copying to clipboard fails", async () => {
+    copyTextMock.mockRejectedValueOnce(new Error("Clipboard denied"));
+    await renderPanel();
+
+    const copyBtn = container.querySelector<HTMLButtonElement>('button[title="Copy Markdown"]');
+    expect(copyBtn).not.toBeNull();
+
+    await act(async () => {
+      copyBtn!.click();
+    });
+
+    expect(copyBtn?.textContent).toContain("Failed");
+
+    await act(async () => {
+      vi.advanceTimersByTime(2100);
+    });
+
+    expect(copyBtn?.textContent).toContain("Copy");
+  });
+
+  it("resets copy confirmation state when document key changes", async () => {
+    await renderPanel();
+
+    const copyBtn = container.querySelector<HTMLButtonElement>('button[title="Copy Markdown"]');
+    await act(async () => {
+      copyBtn!.click();
+    });
+    expect(copyBtn?.textContent).toContain("Copied");
+
+    const otherDoc: IssueDocument = { ...sampleDoc, key: "other-doc", title: "Other Document" };
+    client.setQueryData([...queryKeys.issues.documents(otherDoc.issueId), otherDoc.key], otherDoc);
+
+    await act(async () => {
+      root.render(
+        <QueryClientProvider client={client}>
+          <TaskDocumentPanel issueId={otherDoc.issueId} documentKey={otherDoc.key} initialDocument={otherDoc} />
+        </QueryClientProvider>,
+      );
+    });
+
+    const newCopyBtn = container.querySelector<HTMLButtonElement>('button[title="Copy Markdown"]');
+    expect(newCopyBtn?.textContent).toContain("Copy");
+  });
+
   it("triggers download with safe slugified filename and falls back to key when title is absent", async () => {
     const createObjectURLMock = vi.fn(() => "blob:http://localhost/test-uuid");
     const revokeObjectURLMock = vi.fn();
@@ -138,9 +192,10 @@ describe("TaskDocumentPanel", () => {
     });
 
     expect(createObjectURLMock).toHaveBeenCalled();
-    expect(clickedAnchor).not.toBeNull();
-    expect(clickedAnchor?.download).toBe("why-i-run-dual-caddy.md");
-    expect(clickedAnchor?.href).toBe("blob:http://localhost/test-uuid");
+    const anchor = clickedAnchor as HTMLAnchorElement | null;
+    expect(anchor).not.toBeNull();
+    expect(anchor?.download).toBe("why-i-run-dual-caddy.md");
+    expect(anchor?.href).toBe("blob:http://localhost/test-uuid");
 
     await act(async () => {
       vi.advanceTimersByTime(1100);
@@ -151,7 +206,8 @@ describe("TaskDocumentPanel", () => {
     await act(async () => {
       downloadBtn!.click();
     });
-    expect(clickedAnchor?.download).toBe("published-post.md");
+    const secondAnchor = clickedAnchor as HTMLAnchorElement | null;
+    expect(secondAnchor?.download).toBe("published-post.md");
 
     appendChildSpy.mockRestore();
     vi.unstubAllGlobals();
