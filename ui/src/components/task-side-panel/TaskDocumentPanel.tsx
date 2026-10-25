@@ -69,7 +69,7 @@ export function TaskDocumentPanel({
   }
 
   const handleCopy = async () => {
-    if (!document.body) return;
+    if (document.body == null) return;
     try {
       await copyTextToClipboard(document.body);
       setCopied(true);
@@ -80,25 +80,25 @@ export function TaskDocumentPanel({
   };
 
   const handleDownload = () => {
-    if (!document.body) return;
+    if (document.body == null) return;
     const blob = new Blob([document.body], { type: "text/markdown;charset=utf-8" });
     const url = URL.createObjectURL(blob);
     const link = window.document.createElement("a");
     link.href = url;
-    const safeTitle = (document.title || document.key || "document")
+    const safeTitle = (document.title?.trim() || document.key || "document")
       .toLowerCase()
-      .replace(/[^a-z0-9_-]+/g, "-")
+      .replace(/[^\p{L}\p{N}_-]+/gu, "-")
       .replace(/^-+|-+$/g, "");
     link.download = `${safeTitle || "document"}.md`;
     window.document.body.appendChild(link);
     link.click();
     window.document.body.removeChild(link);
-    URL.revokeObjectURL(url);
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
   };
 
   return (
     <article className="space-y-4">
-      <header className="space-y-2 border-b pb-3">
+      <header className="space-y-2">
         <div className="flex items-center justify-end gap-1.5">
           <Button
             variant="outline"
@@ -123,7 +123,7 @@ export function TaskDocumentPanel({
             <span>Download</span>
           </Button>
         </div>
-        <h2 className="text-lg font-semibold leading-tight">{documentDisplayTitle(document)}</h2>
+        <h2 className="text-lg font-semibold">{documentDisplayTitle(document)}</h2>
         <div className="flex flex-wrap items-center gap-1 text-xs text-muted-foreground">
           <span>{`Revision ${document.latestRevisionNumber ?? 1}`}</span>
           <span aria-hidden>·</span>

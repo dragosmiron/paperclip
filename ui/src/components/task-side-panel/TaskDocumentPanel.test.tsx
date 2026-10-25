@@ -46,6 +46,7 @@ describe("TaskDocumentPanel", () => {
   let client: QueryClient;
 
   beforeEach(() => {
+    vi.useFakeTimers();
     container = document.createElement("div");
     document.body.appendChild(container);
     root = createRoot(container);
@@ -60,6 +61,7 @@ describe("TaskDocumentPanel", () => {
     container.remove();
     document.body.innerHTML = "";
     client.clear();
+    vi.useRealTimers();
     vi.restoreAllMocks();
   });
 
@@ -89,7 +91,7 @@ describe("TaskDocumentPanel", () => {
     expect(downloadBtn?.textContent).toContain("Download");
   });
 
-  it("copies markdown body and shows confirmation when copy button is clicked", async () => {
+  it("copies markdown body, shows confirmation, and reverts label after timeout", async () => {
     await renderPanel();
 
     const copyBtn = container.querySelector<HTMLButtonElement>('button[title="Copy Markdown"]');
@@ -101,9 +103,15 @@ describe("TaskDocumentPanel", () => {
 
     expect(copyTextMock).toHaveBeenCalledWith(sampleDoc.body);
     expect(copyBtn?.textContent).toContain("Copied");
+
+    await act(async () => {
+      vi.advanceTimersByTime(1600);
+    });
+
+    expect(copyBtn?.textContent).toContain("Copy");
   });
 
-  it("triggers download with safe slugified filename when download button is clicked", async () => {
+  it("triggers download with safe slugified filename and falls back to key when title is absent", async () => {
     const createObjectURLMock = vi.fn(() => "blob:http://localhost/test-uuid");
     const revokeObjectURLMock = vi.fn();
     vi.stubGlobal("URL", {
@@ -133,7 +141,17 @@ describe("TaskDocumentPanel", () => {
     expect(clickedAnchor).not.toBeNull();
     expect(clickedAnchor?.download).toBe("why-i-run-dual-caddy.md");
     expect(clickedAnchor?.href).toBe("blob:http://localhost/test-uuid");
+
+    await act(async () => {
+      vi.advanceTimersByTime(1100);
+    });
     expect(revokeObjectURLMock).toHaveBeenCalledWith("blob:http://localhost/test-uuid");
+
+    await renderPanel({ ...sampleDoc, title: "" });
+    await act(async () => {
+      downloadBtn!.click();
+    });
+    expect(clickedAnchor?.download).toBe("published-post.md");
 
     appendChildSpy.mockRestore();
     vi.unstubAllGlobals();
